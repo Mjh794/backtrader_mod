@@ -84,7 +84,7 @@ class MetaAnalyzer(bt.MetaParams):
 
         # Return to the normal chain
         return _obj, args, kwargs
-
+ 
 
 class Analyzer(with_metaclass(MetaAnalyzer, object)):
     '''Analyzer base class. All analyzers are subclass of this one

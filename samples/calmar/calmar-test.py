@@ -19,12 +19,13 @@
 #
 ###############################################################################
 from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+                        unicode_literals) #确保python2 和python3的兼容性
 
 
 import argparse
 import datetime
-
+import sys
+sys.path.insert(0, 'backtrader')  # 替换为你的本地模块路径
 import backtrader as bt
 
 

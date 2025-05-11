@@ -45,7 +45,13 @@ from .utils import OrderedDict, tzparse, num2date, date2num
 from .strategy import Strategy, SignalStrategy
 from .tradingcal import (TradingCalendarBase, TradingCalendar,
                          PandasMarketCalendar)
+
 from .timer import Timer
+#from .cscvAnalyze import CSCVAnalyzer
+from .ovearfitting_analyzer.cscv_estimate import CSCVAnalyzer
+from .ovearfitting_analyzer.pcscv_estimate import PCSCVAnalyzer
+from .ovearfitting_analyzer.bayesian_estimate import BayesianAnalyzer
+from .ovearfitting_analyzer.stationary_bootstrap import StationaryBootstrapAnalyzer
 
 # Defined here to make it pickable. Ideally it could be defined inside Cerebro
 
@@ -291,6 +297,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         ('cheat_on_open', False),
         ('broker_coo', True),
         ('quicknotify', False),
+    
     )
 
     def __init__(self):
@@ -301,10 +308,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self.feeds = list()
         self.datas = list()
         self.datasbyname = collections.OrderedDict()
-        self.strats = list()
+        self.strats = list() 
         self.optcbs = list()  # holds a list of callbacks for opt strategies
         self.observers = list()
-        self.analyzers = list()
+        self.analyzers = list() 
         self.indicators = list()
         self.sizers = dict()
         self.writers = list()
@@ -314,7 +321,13 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self._signal_strat = (None, None, None)
         self._signal_concurrent = False
         self._signal_accumulate = False
+        self.cscv_analyzer = None
+        self.bayes_analyzer = None
+        self.pcscv_analyzer = None
+        self.stationary_bootstrap_analyzer = None
+        
 
+            
         self._dataid = itertools.count(1)
 
         self._broker = BackBroker()
@@ -568,7 +581,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         may have separate calendars which override the global one
 
         ``cal`` can be an instance of ``TradingCalendar`` a string or an
-        instance of ``pandas_market_calendars``. A string will be will be
+        instance of ``pandas_market_calendars``. A string will be 
         instantiated as a ``PandasMarketCalendar`` (which needs the module
         ``pandas_market_calendar`` installed in the system.
 
@@ -640,10 +653,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         self.indicators.append((indcls, args, kwargs))
 
-    def addanalyzer(self, ancls, *args, **kwargs):
+    def addanalyzer(self, ancls, *args, **kwargs):   #传入类,然后运行的时候进行实例化
         '''
         Adds an ``Analyzer`` class to the mix. Instantiation will be done at
-        ``run`` time
+        ``run`` time  
         '''
         self.analyzers.append((ancls, args, kwargs))
 
@@ -749,7 +762,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         pass
 
-    def adddata(self, data, name=None):
+    def adddata(self, data, name=None):  #这只是一次加入一个data
         '''
         Adds a ``Data Feed`` instance to the mix.
 
@@ -790,7 +803,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         return d
 
-    def rolloverdata(self, *args, **kwargs):
+    def rolloverdata(self, *args, **kwargs):   #这里是处理期货合约的回滚
         '''Chains several data feeds into one
 
         If ``name`` is passed as named argument and is not None it will be put
@@ -847,7 +860,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         return dataname
 
-    def optcallback(self, cb):
+    def optcallback(self, cb): 
         '''
         Adds a *callback* to the list of callbacks that will be called with the
         optimizations when each of the strategies has been run
@@ -917,7 +930,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         can be referenced
         '''
         self.strats.append([(strategy, args, kwargs)])
-        return len(self.strats) - 1
+        return len(self.strats) - 1 #返回一个索引
 
     def setbroker(self, broker):
         '''
@@ -937,6 +950,26 @@ class Cerebro(with_metaclass(MetaParams, object)):
         return self._broker
 
     broker = property(getbroker, setbroker)
+   
+    def add_cscv_analyzer(self, S, performance_metric):
+        """add CSCV analyzer"""
+
+        self.cscv_analyzer = CSCVAnalyzer(S=S, performance_metric=performance_metric,optstrats=self._dooptimize)       
+        print(f"overfitting analyzer CSCV added.")
+    def add_pcscv_analyzer(self,S, purge_period, embargo_period,  performance_metric):
+        """add PCSCV analyzer"""
+        self.pcscv_analyzer = PCSCVAnalyzer(S = S ,purge_period = purge_period, embargo_period = embargo_period , performance_metric = performance_metric, optstrats=self._dooptimize )
+        print(f"overfitting analyzer PCSCV added.")
+    def add_bayes_analyzer(self,  T1, T2, n_gibbs=1500, warm_up=500, n_sim=1000):
+        """add Bayesian-MCMC analyzer"""
+        self.bayes_analyzer = BayesianAnalyzer(T1=T1, T2=T2, n_gibbs=n_gibbs, warm_up=warm_up, n_sim=n_sim,optstrats=self._dooptimize) 
+        print(f"overfitting analyzer Bayesian added.")
+
+    def add_stationary_bootstrap_analyzer(self, T1=1000, T2=1000, q=0.1, n_bootstrap=1000, performance_metric='sharpe'):
+        """add stationary bootstrap analyzer"""
+        self.stationary_bootstrap_analyzer = StationaryBootstrapAnalyzer(T1=T1, T2=T2, q=q, n_bootstrap=n_bootstrap, performance_metric=performance_metric)
+        print(f"overfitting analyzer stationary_bootstrap added.")
+       
 
     def plot(self, plotter=None, numfigs=1, iplot=True, start=None, end=None,
              width=16, height=9, dpi=300, tight=True, use=None,
@@ -1002,14 +1035,14 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         return figs
 
-    def __call__(self, iterstrat):
+    def __call__(self, iterstrat): #通过call可以使得
         '''
         Used during optimization to pass the cerebro over the multiprocesing
         module without complains
         '''
 
         predata = self.p.optdatas and self._dopreload and self._dorunonce
-        return self.runstrategies(iterstrat, predata=predata)
+        return self.runstrategies(iterstrat, predata=predata) #返回的是runstrategies的结果,在这个方法中策略被调用
 
     def __getstate__(self):
         '''
@@ -1027,26 +1060,29 @@ class Cerebro(with_metaclass(MetaParams, object)):
         threads the execution will stop as soon as possible.'''
         self._event_stop = True  # signal a stop has been requested
 
-    def run(self, **kwargs):
+    def run(self, **kwargs): #
         '''The core method to perform backtesting. Any ``kwargs`` passed to it
         will affect the value of the standard parameters ``Cerebro`` was
         instantiated with.
 
-        If ``cerebro`` has not datas the method will immediately bail out.
+        If ``cerebro`` has not datas the method will immediately bail out. #没有数据的时候就直接返回
 
         It has different return values:
 
           - For No Optimization: a list contanining instances of the Strategy
-            classes added with ``addstrategy``
+            classes added with ``addstrategy`` #返回一个列表包含多个策略,对应每个策略的返回?
 
           - For Optimization: a list of lists which contain instances of the
             Strategy classes added with ``addstrategy``
         '''
+        #?
         self._event_stop = False  # Stop is requested
-
+        
+        #
         if not self.datas:
-            return []  # nothing can be run
-
+            return []  # nothing can be run   
+        
+        #
         pkeys = self.params._getkeys()
         for key, val in kwargs.items():
             if key in pkeys:
@@ -1091,9 +1127,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
             self.runwriters.append(wr)
 
         # Write down if any writer wants the full csv output
-        self.writers_csv = any(map(lambda x: x.p.csv, self.runwriters))
+        self.writers_csv = any(map(lambda x: x.p.csv, self.runwriters))   #实在不行就先创建再读取?
 
-        self.runstrats = list()
+        self.runstrats = list()  # 需要运行的策略
 
         if self.signals:  # allow processing of signals
             signalst, sargs, skwargs = self._signal_strat
@@ -1121,11 +1157,11 @@ class Cerebro(with_metaclass(MetaParams, object)):
                              *sargs,
                              **skwargs)
 
-        if not self.strats:  # Datas are present, add a strategy
+        if not self.strats:  
             self.addstrategy(Strategy)
 
         iterstrats = itertools.product(*self.strats)
-        if not self._dooptimize or self.p.maxcpus == 1:
+        if not self._dooptimize or self.p.maxcpus == 1:   
             # If no optimmization is wished ... or 1 core is to be used
             # let's skip process "spawning"
             for iterstrat in iterstrats:
@@ -1156,11 +1192,27 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 for data in self.datas:
                     data.stop()
 
-        if not self._dooptimize:
+        if not self._dooptimize:             
             # avoid a list of list for regular cases
-            return self.runstrats[0]
 
-        return self.runstrats
+            #print('runstrats\' length:', len(self.runstrats))
+            return self.runstrats[0]  
+        
+         
+        if self.cscv_analyzer is not None:
+            self.cscv_analyzer.collect_returns(self.runstrats)
+            #cscv_results = self.cscv_analyzer.get_analysis()
+        
+        if self.pcscv_analyzer is not None:
+            self.pcscv_analyzer.collect_returns(self.runstrats)
+            #pcscv_results = self.pcscv_analyzer.get_analysis()
+
+        if self.bayes_analyzer is not None:
+            self.bayes_analyzer.collect_returns(self.runstrats)
+            #bayes_res = self.bayes_analyzer.get_analysis()
+            
+            
+        return {'results': self.runstrats, 'cscv': self.cscv_analyzer , 'pcscv' : self.pcscv_analyzer, 'bayes': self.bayes_analyzer}
 
     def _init_stcount(self):
         self.stcount = itertools.count(0)
@@ -1168,7 +1220,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
     def _next_stid(self):
         return next(self.stcount)
 
-    def runstrategies(self, iterstrat, predata=False):
+    def runstrategies(self, iterstrat, predata=False):  
         '''
         Internal method invoked by ``run``` to run a set of strategies
         '''
@@ -1176,7 +1228,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         self.runningstrats = runstrats = list()
         for store in self.stores:
-            store.start()
+            store.start() 
 
         if self.p.cheat_on_open and self.p.broker_coo:
             # try to activate in broker
@@ -1192,7 +1244,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self._broker.start()
 
         for feed in self.feeds:
-            feed.start()
+            feed.start()  
 
         if self.writers_csv:
             wheaders = list()
@@ -1227,21 +1279,21 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 strat._oldsync = True  # tell strategy to use old clock update
             if self.p.tradehistory:
                 strat.set_tradehistory()
-            runstrats.append(strat)
+            runstrats.append(strat)# 成功实例化的策略会被塞入runstrats中
 
         tz = self.p.tz
         if isinstance(tz, integer_types):
             tz = self.datas[tz]._tz
         else:
-            tz = tzparse(tz)
+            tz = tzparse(tz) #确保策略和数据使用一致的时区，避免时间计算错误
 
-        if runstrats:
+        if runstrats: #如果runstrats不为空
             # loop separated for clarity
-            defaultsizer = self.sizers.get(None, (None, None, None))
-            for idx, strat in enumerate(runstrats):
+            defaultsizer = self.sizers.get(None, (None, None, None)) #sizer可能被默认处理
+            for idx, strat in enumerate(runstrats):  #遍历runstrats
                 if self.p.stdstats:
                     strat._addobserver(False, observers.Broker)
-                    if self.p.oldbuysell:
+                    if self.p.oldbuysell: #这里加入的是特殊的observer
                         strat._addobserver(True, observers.BuySell)
                     else:
                         strat._addobserver(True, observers.BuySell,
@@ -1253,20 +1305,23 @@ class Cerebro(with_metaclass(MetaParams, object)):
                         strat._addobserver(False, observers.DataTrades)
 
                 for multi, obscls, obsargs, obskwargs in self.observers:
-                    strat._addobserver(multi, obscls, *obsargs, **obskwargs)
+                    strat._addobserver(multi, obscls, *obsargs, **obskwargs)#是多个observer的意思吗
 
                 for indcls, indargs, indkwargs in self.indicators:
                     strat._addindicator(indcls, *indargs, **indkwargs)
 
                 for ancls, anargs, ankwargs in self.analyzers:
-                    strat._addanalyzer(ancls, *anargs, **ankwargs)
+                    strat._addanalyzer(ancls, *anargs, **ankwargs)  #给什么东西加入analyzer?给即将执行的策略加入analyzer
 
                 sizer, sargs, skwargs = self.sizers.get(idx, defaultsizer)
                 if sizer is not None:
-                    strat._addsizer(sizer, *sargs, **skwargs)
+                    strat._addsizer(sizer, *sargs, **skwargs)#不为空的话才加入,默认是空
 
-                strat._settz(tz)
-                strat._start()
+                strat._settz(tz) #策略和数据使用一致的时区，避免时间计算错误
+                strat._start()  #开始策略的执行  ,执行后应该有一系列返回值储存在对象中(这里表明,每个策略是分开执行的,因此我要把每个策略执行后的结果汇总....)
+                '''
+                带有下划线开头的命名往往意味着是涉及生命周期管理的方法,这类方法往往是内部调用,不呈现给用户
+                '''
 
                 for writer in self.runwriters:
                     if writer.p.csv:
@@ -1332,10 +1387,10 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
                 oreturn = OptReturn(strat.params, analyzers=strat.analyzers, strategycls=type(strat))
                 results.append(oreturn)
+           
+            return results 
 
-            return results
-
-        return runstrats
+        return runstrats  
 
     def stop_writers(self, runstrats):
         cerebroinfo = OrderedDict()

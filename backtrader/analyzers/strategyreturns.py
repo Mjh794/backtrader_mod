@@ -1,3 +1,5 @@
+
+
 #!/usr/bin/env python
 # -*- coding: utf-8; py-indent-offset:4 -*-
 ###############################################################################
@@ -18,29 +20,33 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 ###############################################################################
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
+import backtrader as bt
+class strategyreturns(bt.Analyzer):
+    def __init__(self):
+        self.start_value = None
+        self.end_value = None
+        self.returns = []
 
-# The modules below should/must define __all__ with the objects wishes
-# or prepend an "_" (underscore) to private classes/variables
+    def start(self):
+        self.start_value = self.strategy.broker.getvalue()
 
-from .annualreturn import *
-from .drawdown import *
-from .timereturn import *
-from .sharpe import *
-from .tradeanalyzer import *
-from .sqn import *
-from .leverage import *
-from .positions import *
-from .transactions import *
-from .pyfolio import *
-from .returns import *
-from .vwr import *
-from .MaxDrawDown import *
-from .cscv import *
-from .multiCSCV import *
-from .logreturnsrolling import *
+    def next(self):
+        value = self.strategy.broker.getvalue()
+        if self.returns:
+            ret = (value - self.prev_value) / self.prev_value
+            self.returns.append(ret)
+        else:
+            self.returns.append(0.0)
+        self.prev_value = value
 
-from .strategyreturns import *
-from .calmar import *
-from .periodstats import *
+    def stop(self):
+        self.end_value = self.strategy.broker.getvalue()
+
+    def get_analysis(self):
+        total_return = (self.end_value - self.start_value) / self.start_value
+        return {
+            'start_value': self.start_value,
+            'end_value': self.end_value,
+            'total_return': total_return,
+            'daily_returns': self.returns
+        }

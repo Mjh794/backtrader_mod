@@ -199,7 +199,7 @@ def num2time(num, tz=None, naive=True):
     return num2date(num, tz=tz, naive=naive).time()
 
 
-def date2num(dt, tz=None):
+def date2num(dt, tz=None):  
     """
     Convert :mod:`datetime` to the Gregorian date as UTC float days,
     preserving hours, minutes, seconds and microseconds.  Return value

@@ -150,7 +150,7 @@ class SharpeRatio(Analyzer):
             self.ratio = retavg / retdev
         else:
             # Get the returns from the subanalyzer
-            returns = list(itervalues(self.timereturn.get_analysis()))
+            returns = list(itervalues(self.timereturn.get_analysis())) 
 
             rate = self.p.riskfreerate  #
 

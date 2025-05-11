@@ -393,15 +393,15 @@ class Strategy(with_metaclass(MetaStrategy, StrategyBase)):
     def _start(self):
         self._periodset()
 
-        for analyzer in itertools.chain(self.analyzers, self._slave_analyzers):
-            analyzer._start()
+        for analyzer in itertools.chain(self.analyzers, self._slave_analyzers):#这里可以看出允许分析器调用其他分析器
+            analyzer._start()#在启动策略的时候启动分析器
 
         for obs in self.observers:
             if not isinstance(obs, list):
                 obs = [obs]  # support of multi-data observers
 
             for o in obs:
-                o._start()
+                o._start() #启动观察者
 
         # change operators to stage 2
         self._stage2()

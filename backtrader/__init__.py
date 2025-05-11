@@ -60,6 +60,7 @@ from .writer import *
 from .signal import *
 
 from .cerebro import *
+from .cerebroMOD import *
 from .timer import *
 from .flt import *
 
@@ -82,6 +83,7 @@ from . import sizers as sizers
 from . import stores as stores
 from . import brokers as brokers
 from . import timer as timer
+from . import ovearfitting_analyzer as ovearfitting_analyzers
 
 from . import talib as talib
 

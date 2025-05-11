@@ -29,7 +29,7 @@ import backtrader as bt
 import backtrader.indicators as btind
 
 
-chkdatas = 1
+chkdatas = 1 #使用一个数据集进行测试
 
 
 class TestStrategy(bt.Strategy):
